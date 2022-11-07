@@ -31,16 +31,12 @@ def create_data():
 
     return train_dat, test_dat
 
-
-
 def remove_label(train_dat):
     data = []
     for i in range(np.shape(train_dat)[0]):
         data.append(train_dat[i][0])
 
     return np.array(data)
-
-
 
 def center_values(data):
     data_cent = np.zeros(np.shape(data)[0])
@@ -68,5 +64,8 @@ mean = mean(data)
 # we have 1920 variables and 650 observations for each variable thus transpose is required before calculating covariance matrix
 cov_mat = np.cov(data.transpose())
 y = multivariate_normal.pdf(data[5,:], mean=mean, cov=cov_mat, allow_singular=True)
+#Stuck since the covariance matrix is a singular matrix
+
+
 
 print("Done!")
