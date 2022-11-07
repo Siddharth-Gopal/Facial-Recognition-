@@ -1,9 +1,13 @@
 import numpy as np
+from numpy import *
 import pandas
 import matplotlib.pyplot as plt
 from scipy.io import loadmat
 import random
 from scipy.stats import multivariate_normal
+import skimage.measure
+import math
+from sklearn.covariance import ShrunkCovariance
 
 random.seed(5)
 train_set = random.sample(range(0, 68), 50)
@@ -12,6 +16,21 @@ test_sub = []
 
 annots = loadmat('pose.mat')
 data = annots["pose"]
+
+def norm_pdf_multivariate(x, mu, sigma):
+    size = len(x)
+    if size == len(mu) and (size, size) == sigma.shape:
+        det = linalg.det(sigma)
+        if det == 0:
+            raise NameError("The covariance matrix can't be singular")
+
+        norm_const = 1.0/ ( math.pow((2*pi),float(size)/2) * math.pow(det,1.0/2) )
+        x_mu = matrix(x - mu)
+        inv = sigma.I
+        result = math.pow(math.e, -0.5 * (x_mu * inv * x_mu.T))
+        return norm_const * result
+    else:
+        raise NameError("The dimensions of the input don't match")
 
 def create_pose_data_set():
     """
@@ -32,6 +51,34 @@ def create_pose_data_set():
         for i in range(0, 13):
             row = data[:, :, i, j].flatten()
             row = np.append(row,i)
+            test_dat.append(row)
+    random.shuffle(test_dat)
+
+    return np.array(train_dat), np.array(test_dat)
+
+def create_pose_data_set_mp():
+    """
+    shuffles and returns train data and test data with each row corresponding to a flattened image.The last element of the row is the label.
+    :return: (numpy array, numpy array)
+    """
+
+    train_dat = []
+    for j in train_set:
+        for i in range(0, 13):
+            img = data[:, :, i, j]
+            img_mp = skimage.measure.block_reduce(img, (3,3), np.max)
+            row = img_mp.flatten()
+            row = np.append(row, i)
+            train_dat.append(row)
+    random.shuffle(train_dat)
+
+    test_dat = []
+    for j in test_set:
+        for i in range(0, 13):
+            img = data[:, :, i, j]
+            img_mp = skimage.measure.block_reduce(img, (3, 3), np.max)
+            row = img_mp.flatten()
+            row = np.append(row, i)
             test_dat.append(row)
     random.shuffle(test_dat)
 
@@ -77,7 +124,7 @@ def data_mean(data):
         mu.append(mu_col)
     return np.array(mu)
 
-def PCA(data, num_components = 50,scree_plot = False):
+def PCA(data, num_components = 50,scree_plot = False, reg=0.01):
     """
     Each row of the data is a sample.
     :param data: data matrix
@@ -89,6 +136,7 @@ def PCA(data, num_components = 50,scree_plot = False):
     # covariance matrix is the relation of each pixel with every other pixel for the data
     # for numpy.cov() each row is a variable and each column is a single observation
     cov_mat = np.cov(data.transpose())
+    cov_mat = cov_mat + np.identity(len(cov_mat))*reg
     eig_val, eig_vec = np.linalg.eigh(cov_mat)
 
     # sorting eigenvalues and eigenvectors
@@ -107,7 +155,7 @@ def PCA(data, num_components = 50,scree_plot = False):
 
     eigenVectors_subset = eigenVectors[:, 0:num_components]
 
-    data_reduced = np.dot(eigenVectors_subset.transpose(), data_cent.transpose()).transpose()
+    data_reduced = np.dot(eigenVectors_subset.transpose(), data.transpose()).transpose()
 
     return data_reduced, eigenVectors_subset
 
@@ -138,16 +186,26 @@ data, labels = remove_label(train_dat)
 
 data_cent = center_values(data)
 
+#Calculating correlation matrix to better understand relation between pixels
+corr_mat = np.corrcoef(data_cent.transpose())
+# data_cent_mp = skimage.measure.block_reduce(data_cent, (3,3), np.max)
+# corr_mat_mp = np.corrcoef(data_cent_mp.transpose())
+
 data_reduced, eigenvectors = PCA(data=data_cent)
 
 data_reduced_w_labels = np.column_stack((data_reduced,labels))
-data_groups = data_grouping(data_reduced_w_labels, labels)
+data_cent_w_labels = np.column_stack((data_cent,labels))
 
-def calc_likelihood(sample,data_group):
+data_groups = data_grouping(train_dat, labels)
+
+
+def calc_likelihood(sample,data_group, reg=0.1):
     cov_mat = np.cov(data_group.transpose())
+    cov_mat = cov_mat + np.identity(len(cov_mat)) * reg
+    cov = ShrunkCovariance().fit(data_group)
     mean = data_mean(data_group)
 
-    y = multivariate_normal.pdf(sample, mean=mean, cov=cov_mat, allow_singular=True)
+    y = multivariate_normal.pdf(sample, mean=mean, cov=cov.covariance_)
     return y
 
 def sample_likelihood(sample,data_groups):
@@ -162,7 +220,16 @@ test_dat_wout_labels,_ = remove_label(test_dat)
 
 test_data_reduced = np.dot(eigenvectors.transpose(), test_dat_wout_labels.transpose()).transpose()
 
-likelihood = sample_likelihood(test_data_reduced[1,:],data_groups)
+likelihood = sample_likelihood(test_dat_wout_labels[1,:],data_groups)
 
 print("Done!")
 
+"""
+Feature Selection is pending
+Check correlation matrix and remove unneccesary features 
+P values are another option 
+Max pooling seems like another option
+Code for it is in scratch 11
+
+Normalization is also pending, all the features should lie between zero and one. 
+"""
