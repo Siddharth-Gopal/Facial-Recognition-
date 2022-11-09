@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.linalg
 from numpy import *
 import pandas
 import matplotlib.pyplot as plt
@@ -17,20 +18,11 @@ test_sub = []
 annots = loadmat('pose.mat')
 data = annots["pose"]
 
-def norm_pdf_multivariate(x, mu, sigma):
-    size = len(x)
-    if size == len(mu) and (size, size) == sigma.shape:
-        det = linalg.det(sigma)
-        if det == 0:
-            raise NameError("The covariance matrix can't be singular")
+def llnorm(sample, mu,sigma):
+    sample_centre = sample - mu
 
-        norm_const = 1.0/ ( math.pow((2*pi),float(size)/2) * math.pow(det,1.0/2) )
-        x_mu = matrix(x - mu)
-        inv = sigma.I
-        result = math.pow(math.e, -0.5 * (x_mu * inv * x_mu.T))
-        return norm_const * result
-    else:
-        raise NameError("The dimensions of the input don't match")
+    ll = -0.5 * np.linalg.det(sigma) - 0.5*np.linalg.multi_dot([sample_centre.transpose(), np.linalg.inv(sigma), sample_centre])
+    return ll
 
 def create_pose_data_set():
     """
@@ -181,6 +173,24 @@ def data_grouping(data,labels):
 
     return data_groups
 
+def calc_likelihood(sample,data_group, reg=0.01):
+    cov_mat = np.cov(data_group.transpose())
+    cov_mat = cov_mat + np.identity(len(cov_mat)) * reg
+    # cov = ShrunkCovariance().fit(data_group)
+    mean = data_mean(data_group)
+
+    y = llnorm(sample,mean,cov_mat)
+    # y = multivariate_normal.pdf(sample, mean=mean, cov=cov.covariance_, allow_singular=True)
+    return y
+
+def sample_likelihood(sample,data_groups):
+    likelihood = []
+    for data_group in data_groups:
+        data_group,label = remove_label(data_group)
+        likelihood.append((calc_likelihood(sample,data_group),label))
+
+    return likelihood
+
 train_dat, test_dat = create_pose_data_set()
 data, labels = remove_label(train_dat)
 
@@ -198,29 +208,13 @@ data_cent_w_labels = np.column_stack((data_cent,labels))
 
 data_groups = data_grouping(train_dat, labels)
 
-
-def calc_likelihood(sample,data_group, reg=0.1):
-    cov_mat = np.cov(data_group.transpose())
-    cov_mat = cov_mat + np.identity(len(cov_mat)) * reg
-    cov = ShrunkCovariance().fit(data_group)
-    mean = data_mean(data_group)
-
-    y = multivariate_normal.pdf(sample, mean=mean, cov=cov.covariance_)
-    return y
-
-def sample_likelihood(sample,data_groups):
-    likelihood = []
-    for data_group in data_groups:
-        data_group,label = remove_label(data_group)
-        likelihood.append((calc_likelihood(sample,data_group),label))
-
-    return likelihood
-
-test_dat_wout_labels,_ = remove_label(test_dat)
+test_dat_wout_labels, test_dat_labels = remove_label(test_dat)
 
 test_data_reduced = np.dot(eigenvectors.transpose(), test_dat_wout_labels.transpose()).transpose()
 
-likelihood = sample_likelihood(test_dat_wout_labels[1,:],data_groups)
+likelihood = sample_likelihood(test_dat_wout_labels[2,:],data_groups)
+likelihood = np.array(likelihood)
+likelihood = likelihood[likelihood[:, 0].argsort()]
 
 print("Done!")
 

@@ -54,10 +54,9 @@ def center_values(data):
 # for numpy.cov() each row is a variable and each column is a single observation
 # we have 1920 variables and 650 observations for each variable thus transpose is required
 data_cent = center_values(data)
-data_cent = data_cent.transpose()
 
 #covariance matrix is 1920*1920, it is thus the relation of each pixel with every other pixel for the the entire train data
-cov_mat = np.cov(data_cent)
+cov_mat = np.cov(data_cent.transpose())
 eig_val, eig_vec = np.linalg.eigh(cov_mat)
 
 idx = eig_val.argsort()[::-1]
@@ -74,7 +73,10 @@ num_components = 50
 eigenVectors_subset = eigenVectors[:,0:num_components]
 
 data_reduced = np.dot(eigenVectors_subset.transpose(),data_cent).transpose()
-data_reduced = np.column_stack(data_reduced,labels)
+data = []
+for i in range(len(data_reduced)):
+    data.append([data_reduced[i,:],labels[i]])
+# data_reduced = np.column_stack(data_reduced,labels)
 
 
 

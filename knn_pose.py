@@ -75,6 +75,7 @@ for k in range(1,51):
 
 plt.scatter(k_col,acc_col)
 plt.show()
+
 # neighbours = get_neighbors(train_dat, test_dat[0], 3)
 # plt.imshow(test_dat[0][0].reshape(48,40))
 # plt.show()
