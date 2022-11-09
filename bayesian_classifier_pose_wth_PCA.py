@@ -101,7 +101,7 @@ def center_values(data):
         col = center_function(data[:,i])
         data_cent = np.column_stack((data_cent,col))
         # print("Added Column")
-    return data_cent[:,1:]
+    return np.array(data_cent[:,1:])
 
 def data_mean(data):
     """

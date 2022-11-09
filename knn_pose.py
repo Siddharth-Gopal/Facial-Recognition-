@@ -17,13 +17,6 @@ def euclidean_distance(row1, row2):
     row2 = row2[0]
     return np.linalg.norm(row1 - row2)
 
-# #first index is the subject number and second index is pose number
-# for j in test_set:
-#     sub_pose = []
-#     for i in range(0,13):
-#         sub_pose.append([data[:,:,i,j].flatten(),i])
-#     test_sub.append(sub_pose)
-
 def create_data():
     test_dat = []
     for j in test_set:
@@ -63,12 +56,16 @@ train_dat, test_dat = create_data()
 k_col = []
 acc_col = []
 
+# for different number of neighbours
 for k in range(1,51):
     count = 0
+
+# for different samples of test data
     for i in range(0, np.shape(test_dat)[0]):
         prediction = predict_classification(train_dat, test_dat[i], k)
         print('Expected %d, Got %d.' % (test_dat[i][1], prediction))
         if test_dat[i][1] == prediction : count = count + 1
+
     print(f'Accuracy is {count/np.shape(test_dat)[0]}')
     k_col.append(k)
     acc_col.append(count/np.shape(test_dat)[0])
@@ -76,6 +73,7 @@ for k in range(1,51):
 plt.scatter(k_col,acc_col)
 plt.show()
 
+# Priting images to verify if things are working correctly.
 # neighbours = get_neighbors(train_dat, test_dat[0], 3)
 # plt.imshow(test_dat[0][0].reshape(48,40))
 # plt.show()

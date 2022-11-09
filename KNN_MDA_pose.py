@@ -90,6 +90,28 @@ def test_data_centre(test_dat, mean):
     data = np.array(data)
     return data
 
+def data_grouping(data,labels):
+    """
+    Groups the data according to its labels
+    :param data: The complete data matrix with labels
+    :param labels: The labels for which the data is to be grouped. Can also input the labels list created with create_data_set()
+    :return: a list of the grouped data
+    """
+
+    data_groups = []
+    def group_data(data, label):
+        data_grouped=np.empty(len(data[0][0]))
+        for i in range(len(data)):
+            if data[i][1]==label:
+                data_grouped = np.vstack((data_grouped,data[i][0]))
+        data_grouped = data_grouped[1:,:]
+        # data_grouped = np.column_stack((data_grouped,np.full(len(data_grouped),label)))
+        return data_grouped
+
+    for i in set(labels):
+        data_groups.append(group_data(data, label=i))
+
+    return data_groups
 
 train_dat, test_dat = create_data()
 data, labels = remove_label(train_dat)
@@ -99,21 +121,43 @@ mean = data_mean(data)
 
 data_cent = center_values(data)
 
-cov_mat = np.cov(data_cent.transpose())
+data_cent_w_labels = []
+for i,row in enumerate(data_cent):
+    data_cent_w_labels.append([row,labels[i]])
 
-eig_val, eig_vec = np.linalg.eigh(cov_mat)
+data_group = data_grouping(data_cent_w_labels, labels)
 
-idx = eig_val.argsort()[::-1]
-eigenValues = eig_val[idx]
-eigenVectors = eig_vec[:,idx]
+SW = np.zeros((np.shape(data)[1], np.shape(data)[1]))
+SB = np.zeros((np.shape(data)[1], np.shape(data)[1]))
 
-num_components = 150
-eigenVectors_subset = eigenVectors[:,0:num_components]
+for group in data_group:
+    group_mean = (data_mean(group))
+    diff = group-group_mean
+    SW += diff.T.dot(diff)
 
-data_reduced = np.dot(eigenVectors_subset.transpose(),data_cent.transpose()).transpose()
+    num_classes = len(data_group)
+    mean_diff = (group_mean - mean).reshape(np.shape(data)[1],1)
+    SB += num_classes * (mean_diff).dot(mean_diff.T)
+
+
+A = np.linalg.inv(SW).dot(SB)
+
+eigenvalues, eigenvectors = np.linalg.eigh(A)
+eigenvectors = eigenvectors.T
+
+idxs = np.argsort(abs(eigenvalues))[::-1]
+eigenvalues = eigenvalues[idxs]
+eigenvectors = eigenvectors[idxs]
+
+num_components = 300
+
+linear_discriminants = eigenvectors[0: num_components]
+
+data_reduced = np.dot(data_cent, linear_discriminants.T)
 
 test_data = test_data_centre(test_dat,mean)
-test_dat = np.dot(eigenVectors_subset.transpose(),test_data.transpose()).transpose()
+
+test_dat = np.dot(test_data, linear_discriminants.T)
 
 train_data = []
 for i in range(len(data_reduced)):
@@ -138,15 +182,5 @@ for k in range(1,31):
 
 plt.scatter(k_col,acc_col)
 plt.show()
-# neighbours = get_neighbors(train_dat, test_dat[0], 3)
-# plt.imshow(test_dat[0][0].reshape(48,40))
-# plt.show()
-# plt.imshow(neighbours[0][0].reshape(48,40))
-# plt.show()
-# plt.imshow(neighbours[1][0].reshape(48,40))
-# plt.show()
-# plt.imshow(neighbours[2][0].reshape(48,40))
-# plt.show()
 
-
-print("Done!")
+print("Done")
