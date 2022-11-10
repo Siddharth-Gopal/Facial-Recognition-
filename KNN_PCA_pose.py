@@ -127,7 +127,7 @@ k_col = []
 acc_col = []
 
 for k in range(1,31):
-    count = 0
+    cccc
     for i in range(0, np.shape(test_data)[0]):
         prediction = predict_classification(train_data, test_data[i], k)
         print('Expected %d, Got %d.' % (test_data[i][1], prediction))

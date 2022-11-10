@@ -27,7 +27,6 @@ def llnorm(sample, mu, sigma):
         [sample_centre.transpose(), np.linalg.inv(sigma), sample_centre])
     return ll
 
-
 def create_pose_data_set():
     """
     shuffles and returns train data and test data with each row corresponding to a flattened image.The last element of the row is the label.
@@ -51,7 +50,6 @@ def create_pose_data_set():
     random.shuffle(test_dat)
 
     return np.array(train_dat), np.array(test_dat)
-
 
 def create_pose_data_set_mp():
     """
@@ -81,7 +79,6 @@ def create_pose_data_set_mp():
 
     return np.array(train_dat), np.array(test_dat)
 
-
 def remove_label(data):
     """
     Removes label from numpy array with each row corresponding to a flattened image
@@ -95,7 +92,6 @@ def remove_label(data):
         labels.append(data[i, -1])
     return np.array(unlabelled_data), np.array(labels)
 
-
 def data_mean(data):
     """
     Returns the mean across all samples, considering that each row of the data is a single sample
@@ -108,7 +104,6 @@ def data_mean(data):
         mu_col = mu_func(data[:, i])
         mu.append(mu_col)
     return np.array(mu)
-
 
 def data_grouping(data, labels):
     """
@@ -133,7 +128,6 @@ def data_grouping(data, labels):
 
     return data_groups
 
-
 def calc_likelihood(sample, data_group, reg=0.01):
     cov_mat = np.cov(data_group.transpose())
     cov_mat = cov_mat + np.identity(len(cov_mat)) * reg
@@ -144,7 +138,6 @@ def calc_likelihood(sample, data_group, reg=0.01):
     # y = multivariate_normal.pdf(sample, mean=mean, cov=cov.covariance_, allow_singular=True)
     return y
 
-
 def sample_likelihood(sample, data_groups):
     likelihood = []
     for data_group in data_groups:
@@ -153,13 +146,83 @@ def sample_likelihood(sample, data_groups):
 
     return likelihood
 
+def PCA(data, num_components = 250,scree_plot = False, reg=0.01):
+    """
+    Each row of the data is a sample.
+    :param data: data matrix
+    :param num_components:
+    :param scree_plot:
+    :return: Reduced data matrix
+    """
+
+    # covariance matrix is the relation of each pixel with every other pixel for the data
+    # for numpy.cov() each row is a variable and each column is a single observation
+    cov_mat = np.cov(data.transpose())
+    cov_mat = cov_mat + np.identity(len(cov_mat))*reg
+    eig_val, eig_vec = np.linalg.eigh(cov_mat)
+
+    # sorting eigenvalues and eigenvectors
+    idx = eig_val.argsort()[::-1]
+    eigenValues = eig_val[idx]
+    eigenVectors = eig_vec[:, idx]
+
+    if scree_plot == True:
+        #Plotting eigenvalues to decide the number of components to pick
+        eigenValues_percent = (eigenValues/sum(eigenValues))*100
+        plt.ylim(0,max(eigenValues_percent))
+        plt.ylabel("% of Eigenvalues")
+        plt.xlabel("Components")
+        plt.bar(list(range(0,len(eigenValues[:100]))),eigenValues_percent[:100])
+        plt.show()
+
+    eigenVectors_subset = eigenVectors[:, 0:num_components]
+
+    data_reduced = np.dot(eigenVectors_subset.transpose(), data.transpose()).transpose()
+
+    return data_reduced, eigenVectors_subset
+
+def center_values(data):
+    """
+    Centers the data around origin considering that each row is a sample
+    :param data: data to be centered
+    :return: centered data
+    """
+    data_cent = np.zeros(np.shape(data)[0])
+    center_function = lambda x: x - x.mean()
+    for i in range(np.shape(data)[1]):
+        col = center_function(data[:,i])
+        data_cent = np.column_stack((data_cent,col))
+        # print("Added Column")
+    return np.array(data_cent[:,1:])
+
+def test_data_centre(test_dat, mean):
+    data = []
+    for i in range(np.shape(test_dat)[0]):
+        row = test_dat[i,:]
+        data.append(row - mean)
+
+    data = np.array(data)
+    return data
+
+
 start = time.time()
 
 train_dat, test_dat = create_pose_data_set()
 data, labels = remove_label(train_dat)
 test_dat, test_labels = remove_label(test_dat)
 
-data_groups = data_grouping(train_dat, labels)
+mean = data_mean(data)
+data_cent = center_values(data)
+# data_cent = np.column_stack((data_cent, labels))
+
+data_reduced, eigenvectors = PCA(data=data_cent)
+
+data_reduced = np.column_stack((data_reduced, labels))
+
+data_groups = data_grouping(data_reduced, labels)
+
+test_data = test_data_centre(test_dat,mean)
+test_dat = np.dot(eigenvectors.transpose(),test_data.transpose()).transpose()
 
 count = 0
 for i, test_row in enumerate(test_dat):
@@ -171,7 +234,7 @@ for i, test_row in enumerate(test_dat):
 
 print(f'Accuracy is {count / np.shape(test_dat)[0]}')
 end = time.time()
-print(f"Time taken = {end-start} seconds")
+print(f"Time taken = {end-start}")
 print("Done!")
 
 
