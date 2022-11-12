@@ -7,7 +7,6 @@ import random
 random.seed(5)
 train_set = random.sample(range(0,68),50)
 test_set = list(set(train_set) ^ set(range(0,68)))
-test_sub = []
 
 annots = loadmat('pose.mat')
 data = annots["pose"]
