@@ -14,6 +14,7 @@ from sklearn import datasets
 
 def accuracy_score(y_true, y_pred):
     """ Compare y_true to y_pred and return the accuracy """
+
     accuracy = np.sum(y_true == y_pred, axis=0) / len(y_true)
     return accuracy
 
@@ -67,9 +68,8 @@ def remove_label(train_dat):
         labels.append(train_dat[i][1])
     return np.array(data),np.array(labels)
 
-def classifier(sample, lagr_multi, support_vector_labels, support_vectors, intercept, alpha):
-    coef = 1
-    power = 2
+def classifier_poly(sample, lagr_multi, support_vector_labels, support_vectors, intercept, power, coef):
+
     def kernel(x1, x2):
         return (np.inner(x1, x2) + coef) ** power
 
@@ -79,7 +79,7 @@ def classifier(sample, lagr_multi, support_vector_labels, support_vectors, inter
             i] * kernel(support_vectors[i], sample)
     prediction += intercept
 
-    return np.sign(alpha*prediction)
+    return np.sign(prediction)
 
 
 def main():
@@ -88,6 +88,10 @@ def main():
     # y = data.target[data.target != 0]
     # y[y == 1] = -1
     # y[y == 2] = 1
+    power = 1
+    coef = 1
+    boosting_num = 2
+
 
     annots = loadmat('data.mat')
     face_data = annots["face"]
@@ -108,7 +112,7 @@ def main():
     X = X[1:, :]
     y = np.array(Y)
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.10)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.10, seed=5)
 
     # clf = SupportVectorMachine(kernel=polynomial_kernel, power=2, coef=1)
     weights = np.full(len(y_train), 1 / len(y_train))
@@ -118,14 +122,14 @@ def main():
     support_vectors = []
     intercept = []
 
-    for i in range(4):
+    for i in range(boosting_num):
         X = np.empty(np.shape(X_train)[1])
         for id, row in enumerate(X_train):
             X_row = np.multiply(row, weights[id])
             X = np.vstack((X, X_row))
         X = X[1:, :]
 
-        clf = SupportVectorMachine(kernel=polynomial_kernel, power=2, coef=1)
+        clf = SupportVectorMachine(kernel=polynomial_kernel, power=power, coef=coef)
         lagr_multi_temp, support_vectors_labels_temp, support_vectors_temp, intercept_temp = clf.fit(X, y_train)
 
         lagr_multi.append(lagr_multi_temp)
@@ -139,7 +143,7 @@ def main():
 
 
         for idx, sample in enumerate(X_train):
-            prediction = classifier(sample, lagr_multi, support_vectors_labels, support_vectors, intercept, alpha=1)
+            prediction = classifier_poly(sample, lagr_multi_temp, support_vectors_labels_temp, support_vectors_temp, intercept_temp, power, coef)
             # Is this correct?? Should alpha be applied before or after the sign function
             # prediction = alpha * prediction
 
@@ -163,16 +167,30 @@ def main():
             else:
                 weights[id] = weights[id] / (2 * (1 - epsilon))
 
+        print(f"{i} iteration")
+        accuracy = accuracy_score(y_train, y_pred)
+        print("Training Accuracy:", accuracy)
 
-    for i in range(4):
-        for idx, sample in enumerate(X_train):
-            prediction = classifier(sample, lagr_multi, support_vectors_labels, support_vectors, intercept, alpha=1)
+    y_final_pred = np.zeros(len(y_test))
+    for i in range(boosting_num):
+        y_pred = []
+        for idx, sample in enumerate(X_test):
+            prediction = classifier_poly(sample, lagr_multi[i], support_vectors_labels[i], support_vectors[i], intercept[i], power, coef)
+            prediction = alpha[i]*prediction
+            y_pred.append(prediction)
 
-        y_pred = clf.predict(X_test)
+        y_final_pred = np.add(y_final_pred,y_pred)
 
-        accuracy = accuracy_score(y_test, y_pred)
 
-        print("Accuracy:", accuracy)
+
+    # y_pred = clf.predict(X_test)
+    sign_func = np.vectorize(np.sign)
+    y_final_pred = sign_func(y_final_pred)
+    accuracy = accuracy_score(y_test, y_final_pred)
+
+    print("Overall Accuracy:", accuracy)
+
+    print("Done")
 
 
 

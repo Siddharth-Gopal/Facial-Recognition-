@@ -94,11 +94,11 @@ def main():
     X = X[1:, :]
     y = np.array(Y)
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.10)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.10, seed=5)
 
-    clf = SupportVectorMachine(kernel=polynomial_kernel, power=2, coef=1)
+    clf = SupportVectorMachine(kernel=polynomial_kernel, power=1, coef=1)
     clf.fit(X_train, y_train)
-    clf.adaboost(X_test,y_test)
+    # clf.adaboost(X_test,y_test)
     y_pred = clf.predict(X_test)
 
     accuracy = accuracy_score(y_test, y_pred)
